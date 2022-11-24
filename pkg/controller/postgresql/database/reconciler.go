@@ -289,8 +289,16 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotDatabase)
 	}
 
-	err := c.db.Exec(ctx, xsql.Query{String: "DROP DATABASE IF EXISTS " + pq.QuoteIdentifier(meta.GetExternalName(cr))})
+	var query xsql.Query
+	if cr.Spec.ForProvider.ForceDelete != nil && *cr.Spec.ForProvider.ForceDelete {
+		query = xsql.Query{String: "DROP DATABASE IF EXISTS" + pq.QuoteIdentifier(meta.GetExternalName(cr)) + " with (FORCE)"}
+	} else {
+		query = xsql.Query{String: "DROP DATABASE IF EXISTS " + pq.QuoteIdentifier(meta.GetExternalName(cr))}
+	}
+
+	err := c.db.Exec(ctx, query)
 	return errors.Wrap(err, errDropDB)
+
 }
 
 func upToDate(observed, desired v1alpha1.DatabaseParameters) bool {
@@ -331,6 +339,10 @@ func lateInit(observed v1alpha1.DatabaseParameters, desired *v1alpha1.DatabasePa
 	}
 	if desired.Tablespace == nil {
 		desired.Tablespace = observed.Tablespace
+		li = true
+	}
+	if desired.ForceDelete == nil {
+		desired.ForceDelete = observed.ForceDelete
 		li = true
 	}
 

@@ -559,6 +559,26 @@ func TestDelete(t *testing.T) {
 			},
 			want: errors.Wrap(errBoom, errDropDB),
 		},
+		"ErrDropDBForce": {
+			reason: "Errors dropping a database should be returned",
+			fields: fields{
+				db: &mockDB{
+					MockExec: func(ctx context.Context, q xsql.Query) error {
+						return errBoom
+					},
+				},
+			},
+			args: args{
+				mg: &v1alpha1.Database{
+					Spec: v1alpha1.DatabaseSpec{
+						ForProvider: v1alpha1.DatabaseParameters{
+							ForceDelete: newTrue(),
+						},
+					},
+				},
+			},
+			want: errors.Wrap(errBoom, errDropDB),
+		},
 	}
 
 	for name, tc := range cases {
@@ -570,4 +590,10 @@ func TestDelete(t *testing.T) {
 			}
 		})
 	}
+
+}
+
+func newTrue() *bool {
+	b := true
+	return &b
 }

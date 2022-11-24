@@ -78,6 +78,11 @@ spec:
                       by the PostgreSQL server are described in Section 23.3.1. See
                       below for additional restrictions.
                     type: string
+                  forceDelete:
+                    description: If true, then this database will be deleted with
+                      force statement if false (the default), default drop statement
+                      will be executed
+                    type: boolean
                   isTemplate:
                     description: If true, then this database can be cloned by any
                       user with CREATEDB privileges; if false (the default), then

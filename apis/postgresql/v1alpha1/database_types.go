@@ -73,6 +73,10 @@ type DatabaseParameters struct {
 	// privileges; if false (the default), then only superusers or the owner of
 	// the database can clone it.
 	IsTemplate *bool `json:"isTemplate,omitempty"`
+
+	// If true, then this database will be deleted with force statement
+	//  if false (the default), default drop statement will be executed
+	ForceDelete *bool `json:"forceDelete,omitempty"`
 }
 
 // A DatabaseSpec defines the desired state of a Database.
