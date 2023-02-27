@@ -5,7 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: grants.postgresql.sql.crossplane.io
+  name: defaultprivileges.postgresql.sql.crossplane.io
 spec:
   group: postgresql.sql.crossplane.io
   names:
@@ -13,10 +13,10 @@ spec:
     - crossplane
     - managed
     - sql
-    kind: Grant
-    listKind: GrantList
-    plural: grants
-    singular: grant
+    kind: DefaultPrivilege
+    listKind: DefaultPrivilegeList
+    plural: defaultprivileges
+    singular: defaultprivilege
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -32,19 +32,20 @@ spec:
     - jsonPath: .spec.forProvider.role
       name: ROLE
       type: string
-    - jsonPath: .spec.forProvider.memberOf
-      name: MEMBER OF
-      type: string
     - jsonPath: .spec.forProvider.database
       name: DATABASE
       type: string
     - jsonPath: .spec.forProvider.privileges
       name: PRIVILEGES
       type: string
+    - jsonPath: .spec.forProvider.schema
+      name: SCHEMA
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A Grant represents the declarative state of a PostgreSQL grant.
+        description: A DefaultPrivilege represents the declarative state of a PostgreSQL
+          DefaultPrivilege.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -59,7 +60,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A GrantSpec defines the desired state of a Grant.
+            description: A DefaultPrivilegeSpec defines the desired state of a DefaultPrivilege.
             properties:
               deletionPolicy:
                 default: Delete
@@ -71,14 +72,14 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: GrantParameters define the desired state of a PostgreSQL
-                  grant instance.
+                description: DefaultPrivilegeParameters define the desired state of
+                  a PostgreSQL DefaultPrivilege instance.
                 properties:
                   database:
-                    description: Database this grant is for.
+                    description: Database this DefaultPrivilege is for.
                     type: string
                   databaseRef:
-                    description: DatabaseRef references the database object this grant
+                    description: DatabaseRef references the database object this DefaultPrivilege
                       it for.
                     properties:
                       name:
@@ -114,7 +115,7 @@ spec:
                     type: object
                   databaseSelector:
                     description: DatabaseSelector selects a reference to a Database
-                      this grant is for.
+                      this DefaultPrivilege is for.
                     properties:
                       matchControllerRef:
                         description: MatchControllerRef ensures an object with the
@@ -152,18 +153,12 @@ spec:
                             type: string
                         type: object
                     type: object
-                  grantType:
-                    default: DATABASE
-                    description: Type of grant this grant is for. See https://www.postgresql.org/docs/current/sql-grant.html
-                      for available privileges.
+                  owner:
+                    description: Role this DefaultPrivilege is for.
                     type: string
-                  memberOf:
-                    description: MemberOf is the Role that this grant makes Role a
-                      member of.
-                    type: string
-                  memberOfRef:
-                    description: MemberOfRef references the Role that this grant makes
-                      Role a member of.
+                  ownerRef:
+                    description: RoleRef references the role object this DefaultPrivilege
+                      is for.
                     properties:
                       name:
                         description: Name of the referenced object.
@@ -196,9 +191,9 @@ spec:
                     required:
                     - name
                     type: object
-                  memberOfSelector:
-                    description: MemberOfSelector selects a reference to a Role that
-                      this grant makes Role a member of.
+                  ownerSelector:
+                    description: RoleSelector selects a reference to a Role this DefaultPrivilege
+                      is for.
                     properties:
                       matchControllerRef:
                         description: MatchControllerRef ensures an object with the
@@ -237,20 +232,21 @@ spec:
                         type: object
                     type: object
                   privileges:
-                    description: Privileges to be granted. See https://www.postgresql.org/docs/current/sql-grant.html
+                    description: Privileges to be DefaultPrivilegeed. See https://www.postgresql.org/docs/current/sql-DefaultPrivilege.html
                       for available privileges.
                     items:
-                      description: GrantPrivilege represents a privilege to be granted
+                      description: DefaultPrivilegePrivilege represents a privilege
+                        to be DefaultPrivilegeed
                       pattern: ^[A-Z]+$
                       type: string
                     minItems: 1
                     type: array
                   role:
-                    description: Role this grant is for.
+                    description: Role this DefaultPrivilege is for.
                     type: string
                   roleRef:
-                    description: RoleRef references the role object this grant is
-                      for.
+                    description: RoleRef references the role object this DefaultPrivilege
+                      is for.
                     properties:
                       name:
                         description: Name of the referenced object.
@@ -284,7 +280,7 @@ spec:
                     - name
                     type: object
                   roleSelector:
-                    description: RoleSelector selects a reference to a Role this grant
+                    description: RoleSelector selects a reference to a Role this DefaultPrivilege
                       is for.
                     properties:
                       matchControllerRef:
@@ -324,17 +320,7 @@ spec:
                         type: object
                     type: object
                   schema:
-                    description: Schema this grant is for. See https://www.postgresql.org/docs/current/sql-grant.html
-                      for available privileges.
-                    type: string
-                  withOption:
-                    description: WithOption allows an option to be set on the grant.
-                      See https://www.postgresql.org/docs/current/sql-grant.html for
-                      available options for each grant type, and the effects of applying
-                      the option.
-                    enum:
-                    - ADMIN
-                    - GRANT
+                    description: Schema this DefaultPrivilege is for.
                     type: string
                 type: object
               providerConfigRef:
@@ -509,7 +495,8 @@ spec:
             - forProvider
             type: object
           status:
-            description: A GrantStatus represents the observed state of a Grant.
+            description: A DefaultPrivilegeStatus represents the observed state of
+              a DefaultPrivilege.
             properties:
               conditions:
                 description: Conditions of the resource.

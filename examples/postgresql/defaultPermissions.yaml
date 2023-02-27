@@ -1,0 +1,24 @@
+
+apiVersion: postgresql.sql.crossplane.io/v1alpha1
+kind: DefaultPrivilege
+metadata:
+  name: example-role-default-privileges
+spec:
+  forProvider:
+    schema: public
+    ownerRef:
+      name: example-role
+    privileges:
+      - SELECT
+      - INSERT
+      - UPDATE
+      - DELETE
+      - TRUNCATE
+      - REFERENCES
+      - TRIGGER
+    role: "postgres"
+    databaseRef:
+      name: example
+
+---
+

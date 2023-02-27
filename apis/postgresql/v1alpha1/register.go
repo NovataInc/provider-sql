@@ -90,6 +90,14 @@ var (
 	GrantGroupVersionKind = SchemeGroupVersion.WithKind(GrantKind)
 )
 
+// DefaultPrivilege type metadata.
+var (
+	DefaultPrivilegeKind             = reflect.TypeOf(DefaultPrivilege{}).Name()
+	DefaultPrivilegeGroupKind        = schema.GroupKind{Group: Group, Kind: DefaultPrivilegeKind}.String()
+	DefaultPrivilegeKindAPIVersion   = DefaultPrivilegeKind + "." + SchemeGroupVersion.String()
+	DefaultPrivilegeGroupVersionKind = SchemeGroupVersion.WithKind(DefaultPrivilegeKind)
+)
+
 func init() {
 	SchemeBuilder.Register(&ProviderConfig{}, &ProviderConfigList{})
 	SchemeBuilder.Register(&ProviderConfigUsage{}, &ProviderConfigUsageList{})
@@ -97,4 +105,5 @@ func init() {
 	SchemeBuilder.Register(&Role{}, &RoleList{})
 	SchemeBuilder.Register(&Grant{}, &GrantList{})
 	SchemeBuilder.Register(&Extension{}, &ExtensionList{})
+	SchemeBuilder.Register(&DefaultPrivilege{}, &DefaultPrivilegeList{})
 }

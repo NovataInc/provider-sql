@@ -18,33 +18,31 @@ package v1alpha1
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
+	"github.com/crossplane/crossplane-runtime/pkg/errors"
+	"github.com/crossplane/crossplane-runtime/pkg/reference"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/reference"
 )
 
-// A GrantSpec defines the desired state of a Grant.
-type GrantSpec struct {
+// A DefaultPrivilegeSpec defines the desired state of a DefaultPrivilege.
+type DefaultPrivilegeSpec struct {
 	xpv1.ResourceSpec `json:",inline"`
-	ForProvider       GrantParameters `json:"forProvider"`
+	ForProvider       DefaultPrivilegeParameters `json:"forProvider"`
 }
 
-// GrantPrivilege represents a privilege to be granted
+// DefaultPrivilegePrivilege represents a privilege to be DefaultPrivilegeed
 // +kubebuilder:validation:Pattern:=^[A-Z]+$
-type GrantPrivilege string
+type DefaultPrivilegePrivilege string
 
 // If Privileges are specified, we should have at least one
 
-// GrantPrivileges is a list of the privileges to be granted
+// DefaultPrivilegePrivileges is a list of the privileges to be DefaultPrivilegeed
 // +kubebuilder:validation:MinItems:=1
-type GrantPrivileges []GrantPrivilege
+type DefaultPrivilegePrivileges []DefaultPrivilegePrivilege
 
 // ToStringSlice converts the slice of privileges to strings
-func (gp *GrantPrivileges) ToStringSlice() []string {
+func (gp *DefaultPrivilegePrivileges) ToStringSlice() []string {
 	if gp == nil {
 		return []string{}
 	}
@@ -55,131 +53,97 @@ func (gp *GrantPrivileges) ToStringSlice() []string {
 	return out
 }
 
-// GrantOption represents an OPTION that will be applied to a grant.
-// This modifies the behaviour of the grant depending on the type of
-// grant and option applied.
-type GrantOption string
-
-// The possible values for grant option type.
-const (
-	GrantOptionAdmin GrantOption = "ADMIN"
-	GrantOptionGrant GrantOption = "GRANT"
-)
-
-// GrantOption represents an OPTION that will be applied to a grant.
-// This modifies the behaviour of the grant depending on the type of
-// grant and option applied.
-type GrantType string
-
-// The possible values for grant option type.
-const (
-	GrantSchema   GrantType = "SCHEMA"
-	GrantDatabase GrantType = "DATABASE"
-)
-
-// GrantParameters define the desired state of a PostgreSQL grant instance.
-type GrantParameters struct {
-	// Privileges to be granted.
-	// See https://www.postgresql.org/docs/current/sql-grant.html for available privileges.
+// DefaultPrivilegeParameters define the desired state of a PostgreSQL DefaultPrivilege instance.
+type DefaultPrivilegeParameters struct {
+	// Privileges to be DefaultPrivilegeed.
+	// See https://www.postgresql.org/docs/current/sql-DefaultPrivilege.html for available privileges.
 	// +optional
-	Privileges GrantPrivileges `json:"privileges,omitempty"`
+	Privileges DefaultPrivilegePrivileges `json:"privileges,omitempty"`
 
-	// Schema this grant is for.
-	// See https://www.postgresql.org/docs/current/sql-grant.html for available privileges.
-	// +optional
-	Schema *string `json:"schema,omitempty"`
-
-	// Type of grant this grant is for.
-	// See https://www.postgresql.org/docs/current/sql-grant.html for available privileges.
-	// +kubebuilder:default="DATABASE"
-	GrantType *GrantType `json:"grantType,omitempty"`
-
-	// WithOption allows an option to be set on the grant.
-	// See https://www.postgresql.org/docs/current/sql-grant.html for available
-	// options for each grant type, and the effects of applying the option.
-	// +kubebuilder:validation:Enum=ADMIN;GRANT
-	// +optional
-	WithOption *GrantOption `json:"withOption,omitempty"`
-
-	// Role this grant is for.
+	// Role this DefaultPrivilege is for.
 	// +optional
 	Role *string `json:"role,omitempty"`
 
-	// RoleRef references the role object this grant is for.
+	// Role this DefaultPrivilege is for.
+	// +optional
+	Owner *string `json:"owner,omitempty"`
+
+	// RoleRef references the role object this DefaultPrivilege is for.
+	// +immutable
+	// +optional
+	OwnerRef *xpv1.Reference `json:"ownerRef,omitempty"`
+
+	// RoleSelector selects a reference to a Role this DefaultPrivilege is for.
+	// +immutable
+	// +optional
+	OwnerSelector *xpv1.Selector `json:"ownerSelector,omitempty"`
+
+	// Schema this DefaultPrivilege is for.
+	// +required
+	Schema *string `json:"schema,omitempty"`
+
+	// RoleRef references the role object this DefaultPrivilege is for.
 	// +immutable
 	// +optional
 	RoleRef *xpv1.Reference `json:"roleRef,omitempty"`
 
-	// RoleSelector selects a reference to a Role this grant is for.
+	// RoleSelector selects a reference to a Role this DefaultPrivilege is for.
 	// +immutable
 	// +optional
 	RoleSelector *xpv1.Selector `json:"roleSelector,omitempty"`
 
-	// Database this grant is for.
+	// Database this DefaultPrivilege is for.
 	// +optional
 	Database *string `json:"database,omitempty"`
 
-	// DatabaseRef references the database object this grant it for.
+	// DatabaseRef references the database object this DefaultPrivilege it for.
 	// +immutable
 	// +optional
 	DatabaseRef *xpv1.Reference `json:"databaseRef,omitempty"`
 
-	// DatabaseSelector selects a reference to a Database this grant is for.
+	// DatabaseSelector selects a reference to a Database this DefaultPrivilege is for.
 	// +immutable
 	// +optional
 	DatabaseSelector *xpv1.Selector `json:"databaseSelector,omitempty"`
-
-	// MemberOf is the Role that this grant makes Role a member of.
-	// +optional
-	MemberOf *string `json:"memberOf,omitempty"`
-
-	// MemberOfRef references the Role that this grant makes Role a member of.
-	// +immutable
-	// +optional
-	MemberOfRef *xpv1.Reference `json:"memberOfRef,omitempty"`
-
-	// MemberOfSelector selects a reference to a Role that this grant makes Role a member of.
-	// +immutable
-	// +optional
-	MemberOfSelector *xpv1.Selector `json:"memberOfSelector,omitempty"`
 }
 
-// A GrantStatus represents the observed state of a Grant.
-type GrantStatus struct {
+// A DefaultPrivilegeStatus represents the observed state of a DefaultPrivilege.
+type DefaultPrivilegeStatus struct {
 	xpv1.ResourceStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
 
-// A Grant represents the declarative state of a PostgreSQL grant.
+// A DefaultPrivilege represents the declarative state of a PostgreSQL DefaultPrivilege.
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="SYNCED",type="string",JSONPath=".status.conditions[?(@.type=='Synced')].status"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="ROLE",type="string",JSONPath=".spec.forProvider.role"
-// +kubebuilder:printcolumn:name="MEMBER OF",type="string",JSONPath=".spec.forProvider.memberOf"
 // +kubebuilder:printcolumn:name="DATABASE",type="string",JSONPath=".spec.forProvider.database"
 // +kubebuilder:printcolumn:name="PRIVILEGES",type="string",JSONPath=".spec.forProvider.privileges"
+// +kubebuilder:printcolumn:name="SCHEMA",type="string",JSONPath=".spec.forProvider.schema"
 // +kubebuilder:resource:scope=Cluster,categories={crossplane,managed,sql}
-type Grant struct {
+type DefaultPrivilege struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GrantSpec   `json:"spec"`
-	Status GrantStatus `json:"status,omitempty"`
+	Spec   DefaultPrivilegeSpec   `json:"spec"`
+	Status DefaultPrivilegeStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// GrantList contains a list of Grant
-type GrantList struct {
+// DefaultPrivilegeList contains a list of DefaultPrivilege
+type DefaultPrivilegeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Grant `json:"items"`
+	Items           []DefaultPrivilege `json:"items"`
 }
 
-// ResolveReferences of this Grant
-func (mg *Grant) ResolveReferences(ctx context.Context, c client.Reader) error {
+//
+//// ResolveReferences of this DefaultPrivilege
+func (mg *DefaultPrivilege) ResolveReferences(ctx context.Context, c client.Reader) error {
 	r := reference.NewAPIResolver(c, mg)
 
 	// Resolve spec.forProvider.database
@@ -210,18 +174,19 @@ func (mg *Grant) ResolveReferences(ctx context.Context, c client.Reader) error {
 	mg.Spec.ForProvider.Role = reference.ToPtrValue(rsp.ResolvedValue)
 	mg.Spec.ForProvider.RoleRef = rsp.ResolvedReference
 
-	// Resolve spec.forProvider.memberOf
+	// Resolve spec.forProvider.owner
 	rsp, err = r.Resolve(ctx, reference.ResolutionRequest{
-		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.MemberOf),
-		Reference:    mg.Spec.ForProvider.MemberOfRef,
-		Selector:     mg.Spec.ForProvider.MemberOfSelector,
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.Owner),
+		Reference:    mg.Spec.ForProvider.OwnerRef,
+		Selector:     mg.Spec.ForProvider.OwnerSelector,
 		To:           reference.To{Managed: &Role{}, List: &RoleList{}},
 		Extract:      reference.ExternalName(),
 	})
 	if err != nil {
-		return errors.Wrap(err, "spec.forProvider.memberOf")
+		return errors.Wrap(err, "spec.forProvider.owner")
 	}
-	mg.Spec.ForProvider.MemberOf = reference.ToPtrValue(rsp.ResolvedValue)
-	mg.Spec.ForProvider.MemberOfRef = rsp.ResolvedReference
+	mg.Spec.ForProvider.Owner = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.OwnerRef = rsp.ResolvedReference
+
 	return nil
 }

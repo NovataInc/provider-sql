@@ -17,6 +17,7 @@ limitations under the License.
 package postgresql
 
 import (
+	"github.com/crossplane-contrib/provider-sql/pkg/controller/postgresql/defaultprivileges"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
@@ -37,6 +38,7 @@ func Setup(mgr ctrl.Manager, l logging.Logger) error {
 		role.Setup,
 		grant.Setup,
 		extension.Setup,
+		defaultprivileges.Setup,
 	} {
 		if err := setup(mgr, l); err != nil {
 			return err
