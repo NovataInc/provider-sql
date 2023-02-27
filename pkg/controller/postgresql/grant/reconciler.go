@@ -55,6 +55,8 @@ const (
 	errNoRole       = "role not passed or could not be resolved"
 	errNoDatabase   = "database not passed or could not be resolved"
 	errNoPrivileges = "privileges not passed"
+
+	errNoSchema     = "schema not passed or could not be resolved"
 	errUnknownGrant = "cannot identify grant type based on passed params"
 
 	errInvalidParams = "invalid parameters for grant type %s"
@@ -91,6 +93,21 @@ type connector struct {
 	newDB func(creds map[string][]byte, database string, sslmode string) xsql.DB
 }
 
+func (c *external) GetRoleOID(ctx context.Context, roleName string) int {
+
+	var q xsql.Query
+	q.String = `SELECT oid FROM pg_roles WHERE rolname = $1;
+`
+	q.Parameters = []interface{}{
+		roleName,
+	}
+
+	var oid int
+	if err := c.db.Scan(context.Background(), q, &oid); err != nil {
+		return 0
+	}
+	return oid
+}
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*v1alpha1.Grant)
 	if !ok {
@@ -116,19 +133,25 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New(errNoSecretRef)
 	}
 
+	crateDb := pc.Spec.DefaultDatabase
+	if cr.Spec.ForProvider.Database != nil {
+		crateDb = *cr.Spec.ForProvider.Database
+	}
 	s := &corev1.Secret{}
 	if err := c.kube.Get(ctx, types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, s); err != nil {
 		return nil, errors.Wrap(err, errGetSecret)
 	}
 	return &external{
-		db:   c.newDB(s.Data, pc.Spec.DefaultDatabase, clients.ToString(pc.Spec.SSLMode)),
-		kube: c.kube,
+		db:         c.newDB(s.Data, pc.Spec.DefaultDatabase, clients.ToString(pc.Spec.SSLMode)),
+		dbDatabase: c.newDB(s.Data, crateDb, clients.ToString(pc.Spec.SSLMode)),
+		kube:       c.kube,
 	}, nil
 }
 
 type external struct {
-	db   xsql.DB
-	kube client.Client
+	db         xsql.DB
+	kube       client.Client
+	dbDatabase xsql.DB
 }
 
 type grantType string
@@ -136,6 +159,8 @@ type grantType string
 const (
 	roleMember   grantType = "ROLE_MEMBER"
 	roleDatabase grantType = "ROLE_DATABASE"
+
+	roleSchema grantType = "ROLE_SCHEMA"
 )
 
 func identifyGrantType(gp v1alpha1.GrantParameters) (grantType, error) {
@@ -151,6 +176,22 @@ func identifyGrantType(gp v1alpha1.GrantParameters) (grantType, error) {
 		return roleMember, nil
 	}
 
+	if gp.GrantType != nil && *gp.GrantType == v1alpha1.GrantSchema {
+		if gp.Database == nil {
+			return "", errors.New(errNoDatabase)
+		}
+
+		if gp.Schema == nil {
+			return "", errors.New(errNoSchema)
+		}
+
+		if pc < 1 {
+			return "", errors.New(errNoPrivileges)
+		}
+
+		return roleSchema, nil
+	}
+
 	if gp.Database == nil {
 		return "", errors.New(errNoDatabase)
 	}
@@ -163,13 +204,31 @@ func identifyGrantType(gp v1alpha1.GrantParameters) (grantType, error) {
 	return roleDatabase, nil
 }
 
-func selectGrantQuery(gp v1alpha1.GrantParameters, q *xsql.Query) error {
+func selectGrantQuery(gp v1alpha1.GrantParameters, q *xsql.Query, roleIod int) error {
 	gt, err := identifyGrantType(gp)
 	if err != nil {
 		return err
 	}
 
 	switch gt {
+	case roleSchema:
+
+		q.String = `
+			SELECT EXISTS(
+			SELECT 1
+			FROM (
+				SELECT (aclexplode(nspacl)).* FROM pg_namespace WHERE nspname=$1
+			) as privileges
+			WHERE grantee = $2
+			)
+			`
+
+		q.Parameters = []interface{}{
+			gp.Schema,
+			roleIod,
+		}
+		return nil
+
 	case roleMember:
 		ao := gp.WithOption != nil && *gp.WithOption == v1alpha1.GrantOptionAdmin
 
@@ -237,6 +296,30 @@ func createGrantQueries(gp v1alpha1.GrantParameters, ql *[]xsql.Query) error { /
 	ro := pq.QuoteIdentifier(*gp.Role)
 
 	switch gt {
+	case roleSchema:
+		if gp.Privileges == nil || gp.Schema == nil {
+			return errors.Errorf(errNoSchema, roleSchema)
+		}
+
+		sch := pq.QuoteIdentifier(*gp.Schema)
+		shp := strings.Join(gp.Privileges.ToStringSlice(), ",")
+
+		*ql = append(*ql,
+			// REVOKE ANY MATCHING EXISTING PERMISSIONS
+			xsql.Query{String: fmt.Sprintf("REVOKE ALL ON SCHEMA %s FROM %s",
+				sch,
+				ro,
+			)},
+
+			// GRANT REQUESTED PERMISSIONS
+			xsql.Query{String: fmt.Sprintf("GRANT %s ON SCHEMA %s TO  %s",
+				shp,
+				sch,
+				ro,
+			)},
+		)
+
+		return nil
 	case roleMember:
 		if gp.MemberOf == nil || gp.Role == nil {
 			return errors.Errorf(errInvalidParams, roleMember)
@@ -277,6 +360,7 @@ func createGrantQueries(gp v1alpha1.GrantParameters, ql *[]xsql.Query) error { /
 		)
 		return nil
 	}
+
 	return errors.New(errUnknownGrant)
 }
 
@@ -289,6 +373,12 @@ func deleteGrantQuery(gp v1alpha1.GrantParameters, q *xsql.Query) error {
 	ro := pq.QuoteIdentifier(*gp.Role)
 
 	switch gt {
+	case roleSchema:
+		q.String = fmt.Sprintf("REVOKE ALL ON SCHEMA %s FROM %s",
+			pq.QuoteIdentifier(*gp.Schema),
+			ro,
+		)
+		return nil
 	case roleMember:
 		q.String = fmt.Sprintf("REVOKE %s FROM %s",
 			pq.QuoteIdentifier(*gp.MemberOf),
@@ -318,14 +408,33 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	gp := cr.Spec.ForProvider
 	var query xsql.Query
-	if err := selectGrantQuery(gp, &query); err != nil {
+
+	roleID := c.GetRoleOID(ctx, *cr.Spec.ForProvider.Role)
+
+	if err := selectGrantQuery(gp, &query, roleID); err != nil {
 		return managed.ExternalObservation{}, err
 	}
 
 	exists := false
 
-	if err := c.db.Scan(ctx, query, &exists); err != nil {
+	gt, err := identifyGrantType(cr.Spec.ForProvider)
+	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errSelectGrant)
+	}
+
+	switch gt {
+	case roleSchema:
+		if err := c.dbDatabase.Scan(ctx, query, &exists); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errSelectGrant)
+		}
+	case roleMember:
+		if err := c.db.Scan(ctx, query, &exists); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errSelectGrant)
+		}
+	case roleDatabase:
+		if err := c.db.Scan(ctx, query, &exists); err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, errSelectGrant)
+		}
 	}
 
 	if !exists {
@@ -356,7 +465,20 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateGrant)
 	}
 
-	err := c.db.ExecTx(ctx, queries)
+	gt, err := identifyGrantType(cr.Spec.ForProvider)
+	if err != nil {
+		return managed.ExternalCreation{}, err
+	}
+	switch gt {
+	case roleSchema:
+		err = c.dbDatabase.ExecTx(ctx, queries)
+	case roleMember:
+		err = c.db.ExecTx(ctx, queries)
+	case roleDatabase:
+		err = c.db.ExecTx(ctx, queries)
+
+	}
+
 	return managed.ExternalCreation{}, errors.Wrap(err, errCreateGrant)
 }
 
@@ -380,5 +502,20 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.Wrap(err, errRevokeGrant)
 	}
 
-	return errors.Wrap(c.db.Exec(ctx, query), errRevokeGrant)
+	gt, err := identifyGrantType(cr.Spec.ForProvider)
+	if err != nil {
+		return errors.Wrap(err, errRevokeGrant)
+	}
+
+	switch gt {
+	case roleSchema:
+		return errors.Wrap(c.dbDatabase.Exec(ctx, query), errRevokeGrant)
+	case roleMember:
+		return errors.Wrap(c.db.Exec(ctx, query), errRevokeGrant)
+	case roleDatabase:
+		return errors.Wrap(c.db.Exec(ctx, query), errRevokeGrant)
+	}
+
+	return errors.New(errUnknownGrant)
+
 }

@@ -1,0 +1,19 @@
+
+apiVersion: postgresql.sql.crossplane.io/v1alpha1
+kind: Grant
+metadata:
+  name: example-grant-role-schema
+spec:
+  forProvider:
+    schema: public
+    grantType: SCHEMA
+    privileges:
+      - USAGE
+      - CREATE
+    roleRef:
+      name: example-role
+    databaseRef:
+          name: example
+
+
+
